@@ -1,2 +1,5 @@
-import sqlite3 from "sqlite3";
-export default new sqlite3.Database("db.sqlite");
+import { PrismaClient } from "@prisma/client";
+
+const db = new PrismaClient();
+
+export default db;

@@ -1,11 +1,12 @@
 import express from "express";
+import usersRouter from "./routes/users";
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
-app.get("/", (req, res) => {
-  res.send("Hello, TypeScript with Express!");
-});
+app.use(express.json());
+
+app.use("/users", usersRouter);
 
 app.listen(PORT, () => {
   console.log(`Server is running at http://localhost:${PORT}`);

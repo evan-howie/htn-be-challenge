@@ -1,2 +1,4 @@
 node_modules
 dist
+.env
+src/HTN_2023_BE_Challenge_Data.json
