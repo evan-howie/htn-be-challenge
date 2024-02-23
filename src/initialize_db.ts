@@ -4,17 +4,17 @@ import * as path from "path";
 
 const prisma = new PrismaClient();
 
-interface Skill {
+interface SkillInput {
   skill: string;
   rating: number;
 }
 
-interface User {
+interface UserInput {
   name: string;
   company: string;
   email: string;
   phone: string;
-  skills: Skill[];
+  skills: SkillInput[];
 }
 
 async function main() {
@@ -23,41 +23,63 @@ async function main() {
     "HTN_2023_BE_Challenge_Data.json"
   );
   const usersDataString = await fsPromises.readFile(usersDataPath, "utf-8");
-  const usersData: User[] = JSON.parse(usersDataString);
+  const usersData: UserInput[] = JSON.parse(usersDataString);
 
   for (let i = 0; i < usersData.length; i += 100) {
     const userChunk = usersData.slice(i, i + 100);
 
-    // Batch insert users without their skills
-    const createdUsers = await Promise.all(
-      userChunk.map((user) =>
-        prisma.user.create({
+    // Use transaction for each chunk to ensure data integrity
+    await prisma.$transaction(async (prisma) => {
+      for (const user of userChunk) {
+        const createdUser = await prisma.user.create({
           data: {
             name: user.name,
             company: user.company,
             email: user.email,
             phone: user.phone,
           },
-        })
-      )
-    );
+        });
 
-    // Prepare and insert skills in chunks to ensure data integrity and manage performance
-    const createSkillPromises = createdUsers.flatMap((createdUser, index) => {
-      const userSkills = userChunk[index].skills; // Adjusted to use userChunk
-      return userSkills.map((skill) =>
-        prisma.skill.create({
-          data: {
-            skill: skill.skill,
-            rating: skill.rating,
-            userId: createdUser.id,
-          },
-        })
-      );
+        for (const skill of user.skills) {
+          // Check if the skill already exists to avoid duplicates
+          let skillRecord = await prisma.skill.findUnique({
+            where: {
+              skill: skill.skill,
+            },
+          });
+
+          // If the skill doesn't exist, create it
+          if (!skillRecord) {
+            skillRecord = await prisma.skill.create({
+              data: {
+                skill: skill.skill,
+              },
+            });
+          }
+
+          // Check if the UserSkill record already exists
+          const userSkillRecord = await prisma.userSkill.findUnique({
+            where: {
+              userId_skillId: {
+                userId: createdUser.id,
+                skillId: skillRecord.id,
+              },
+            },
+          });
+
+          // Only create a new UserSkill record if it doesn't already exist
+          if (!userSkillRecord) {
+            await prisma.userSkill.create({
+              data: {
+                userId: createdUser.id,
+                skillId: skillRecord.id,
+                rating: skill.rating,
+              },
+            });
+          }
+        }
+      }
     });
-
-    // Use transaction for each chunk to ensure data integrity
-    await prisma.$transaction(createSkillPromises);
   }
 
   console.log("Database has been initialized with users and their skills.");
@@ -65,7 +87,7 @@ async function main() {
 
 main()
   .catch((e) => {
-    console.error(e);
+    console.error("Error initializing the database:", e);
     process.exit(1);
   })
   .finally(async () => {
