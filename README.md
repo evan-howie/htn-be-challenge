@@ -58,6 +58,15 @@ To get the application running, follow these steps:
    npm run serve
    ```
 
+### Initializing database
+
+To (optionally) initialize the database simply run from the project's root directory:
+
+```bash
+npx prisma migrate dev
+npx ts-node src/initialize_db.ts
+```
+
 ### API Endpoints
 
 The application provides the following RESTful API endpoints:
